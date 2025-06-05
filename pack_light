@@ -17,6 +17,64 @@ import sys
 import tempfile
 from typing import Any, Iterable, Optional
 
+import threading
+import time
+
+input_timeout = 5  # seconds, default timeout for user input
+
+
+def input_with_timeout(prompt, timeout=10, default="y"):
+    user_input = [default]
+    input_received = threading.Event()
+
+    def ask():
+        user_input[0] = input(prompt).strip().lower() or default
+        input_received.set()
+
+    def countdown():
+        for remaining in range(timeout, 0, -1):
+            if input_received.is_set():
+                return
+            print(f"\r⌛ remaining {remaining} seconds, auto choose {default}...", end='', flush=True)
+            time.sleep(1)
+        print()  # 
+
+    input_thread = threading.Thread(target=ask)
+    timer_thread = threading.Thread(target=countdown)
+
+    input_thread.daemon = True
+    timer_thread.daemon = True
+
+    input_thread.start()
+    timer_thread.start()
+
+    input_thread.join(timeout)
+    input_received.set()  # 防止 countdown 線程繼續執行
+    timer_thread.join()
+
+    if input_thread.is_alive():
+        print(f"\n⏰ over {timeout} seconds, auto choose: {default}")
+
+    return user_input[0]
+
+def copytree_with_prompt(src: str, dst: str):
+    if os.path.exists(dst):
+        print(f"⚠️ dst exist：{dst}")
+        choice = input_with_timeout(f"overwrite? (y/n)（{input_timeout} s, default y）: ", input_timeout)
+        #choice = input("overwrite it? (y/n): ").strip().lower()
+
+        if choice != "y":
+            print("❌ user chose not to overwrite. Exiting.")
+            return
+
+        # 確認覆蓋時，先刪掉目標資料夾
+        print(f"🗑️ delete the old dir: {dst} ...")
+        shutil.rmtree(dst)
+
+    print(f"📁 copying ... {src} ➜ {dst}")
+    shutil.copytree(src, dst, symlinks=False, ignore=None)
+    print("✅ copy completed.")
+
 class CPUSignature(enum.Enum):
     inter_ES: 'CPUSignature' = 'Internal_ES'
     inter_QS: 'CPUSignature' = 'Internal_QS'
@@ -58,7 +116,7 @@ class PackageManifest:
     def name(self) -> str:
         print('self.additional_files.length', len(self.additional_files))
         if len(self.additional_files) == 0:
-            return f'Camera_{self.platform}_{self.signature.value}_{self.version}_{self.project}_hlk'
+            return f'Camera_{self.platform}_{self.signature.value}_{self.version}_{self.project}_h'
         return f'Camera_{self.platform}_{self.signature.value}_{self.version}_{self.project}'
 
 
@@ -98,6 +156,8 @@ class KeyCaseInsensitiveValueExtendedDict(collections.OrderedDict):
             if k.lower() != key.lower():
                 continue
             return super().__getitem__(k)
+
+
 
 
 class PackerManifestGenerator:
@@ -184,14 +244,21 @@ class PackerManifestGenerator:
                 raise FileNotFoundError(', '.join(sorted(map(str, missing_infs))))
             
             # print inf versions
-            print(f"\n== Version info ==\n")
-            for inf in sorted(self._infs):
-                config: configparser.ConfigParser = configparser.ConfigParser(
-                allow_no_value=True, dict_type=KeyCaseInsensitiveValueExtendedDict, strict=False)
-                config.optionxform = str
-                config.read(self.base_dir / inf, encoding='utf-16')
-                res = '.'.join(config['version'].get('driverver').split(',')[1:]).strip()
-                print(f'{inf}\t\t{res}')
+            print(f"inf\t\tversion")
+            print(f"====\t\t=======")
+            ver_note_name = f'{self.get_version()}_{CPUSignature(self.get_signature()).value}_note.txt'
+            if (self.dest_dir / ver_note_name).exists():
+                print(f"  {ver_note_name} exists")
+
+            with open(ver_note_name, "w", encoding="utf-8") as f:
+                for inf in sorted(self._infs):
+                    config: configparser.ConfigParser = configparser.ConfigParser(
+                        allow_no_value=True, dict_type=KeyCaseInsensitiveValueExtendedDict, strict=False)
+                    config.optionxform = str
+                    config.read(self.base_dir / inf, encoding='utf-16')
+                    res = '.'.join(config['version'].get('driverver').split(',')[1:]).strip()
+                    print(f'{inf}\t\t{res}\n')
+                    print(f'{inf}\t\t{res}\n', file=f)
             print(f"\n====\n")
             print(f"total {len(self._infs)} infs")
 
@@ -327,9 +394,14 @@ class Packer:
     
     def copy_symbols(self) -> pathlib.Path:
         if os.path.isdir(self.manifest.base_dir / 'PrivateSymbols'):
-            dest = self.manifest.dest_dir / f'PrivateSymbols_{self.manifest.version.replace('.','_')}'
-            print(dest)
-            shutil.copytree(self.manifest.base_dir / 'PrivateSymbols', dest, symlinks=False, ignore=None)
+            if self.manifest.signature == CPUSignature.inter_QS or self.manifest.signature == CPUSignature.ext_QS:
+                print(f'copy symbols from {self.manifest.base_dir / "PrivateSymbols"}')
+                dest: pathlib.Path = self.manifest.dest_dir / f'PrivateSymbols_{self.manifest.version.replace(".","_")}_qs'
+            else:
+                print(f'copy symbols from {self.manifest.base_dir / "PrivateSymbols"}')
+                dest = self.manifest.dest_dir / f'PrivateSymbols_{self.manifest.version.replace('.','_')}'
+            print(f'dest: {dest}')
+            copytree_with_prompt(self.manifest.base_dir / 'PrivateSymbols', dest)
 
 
 

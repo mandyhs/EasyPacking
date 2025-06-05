@@ -24,6 +24,23 @@ FOLDER_LIST: list[str] = [
 
 ZIP_substring = 'symbols.zip'
 
+def copytree_with_prompt(src: str, dst: str):
+    if os.path.exists(dst):
+        print(f"⚠️ dst exist：{dst}")
+        choice = input("overwrite it? (y/n): ").strip().lower()
+
+        if choice != "y":
+            print("❌ user chose not to overwrite. Exiting.")
+            return
+
+        # 確認覆蓋時，先刪掉目標資料夾
+        print(f"🗑️ delete the old dir: {dst} ...")
+        shutil.rmtree(dst)
+
+    print(f"📁 copying ... {src} ➜ {dst}")
+    shutil.copytree(src, dst, symlinks=False, ignore=None)
+    print("✅ copy completed.")
+
 def get_args() -> argparse.Namespace:
     p: pathlib.Path
 
@@ -64,6 +81,7 @@ def keyboard_interrupt_handler(signum: int, frame: object):
 
 def already_extracted(path):
     """check the folder is already extracted and unzipped"""
+    print(f'check if {path} is already extracted')
     return os.path.exists(path) and os.listdir(path)
 
 def main():
@@ -83,7 +101,7 @@ def main():
         print(f'[ERROR] driver path is not exist, please check the version num\n {ICE_plt_path}')
         exit(2)
 
-    print(ICE_plt_path)
+    print(f'ICE_plt_path: {ICE_plt_path}\n')
 
     if str(args.version) == '0':
         # list the latest 3 version 
@@ -94,7 +112,8 @@ def main():
             full_path = os.path.join(ICE_plt_path, fname)
             ts = os.path.getmtime(full_path)
             mod_dt = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-            print(f"{fname}    Last Modified: {mod_dt}")
+            print(f"  {fname}    Last Modified: {mod_dt}")
+        exit(0)
 
     # find zips
     ICE_driver_path = str(ICE_plt_path + str(args.version) + '''\\''') 
@@ -136,7 +155,8 @@ def main():
     # unzip to des folder
     for z in zips:
         if os.path.exists(pathlib.Path(ICE_driver_path,z)):
-            if already_extracted(pathlib.Path(LOCAL_dst,z)):
+            if already_extracted(pathlib.Path(LOCAL_dst,z.replace('_symbols.zip', ''))):
+                # if already extracted, skip it
                 print(f"⏩ Skipped (already extracted): {z}")
                 continue
 
