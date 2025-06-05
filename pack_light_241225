@@ -1,0 +1,442 @@
+#!/usr/bin/env python
+
+import argparse
+import collections
+import configparser
+import dataclasses
+import enum
+import io
+import itertools
+import json
+import math
+import os
+import pathlib
+import shutil
+import signal
+import sys
+import tempfile
+from typing import Any, Iterable, Optional
+
+class CPUSignature(enum.Enum):
+    inter_ES: 'CPUSignature' = 'Internal_ES'
+    inter_QS: 'CPUSignature' = 'Internal_QS'
+    ext_ES: 'CPUSignature' = 'External_ES'
+    ext_QS: 'CPUSignature' = 'External_QS'
+
+
+class Asset(enum.Enum):
+    CONFIG: 'Asset' = 'config'
+
+
+class Config(enum.Enum):
+    PROJECTS: 'Config' = 'projects'
+
+
+class PackageManifestEncoder(json.JSONEncoder):
+    def default(self, obj: Any) -> Any:
+        if isinstance(obj, enum.Enum):
+            return obj.value
+        elif isinstance(obj, pathlib.Path):
+            return str(obj)
+        elif isinstance(obj, set):
+            return sorted(obj)
+        return json.JSONEncoder.default(self, obj)
+
+
+@dataclasses.dataclass
+class PackageManifest:
+    project: str
+    infs: set[pathlib.Path]
+    cats: set[pathlib.Path]
+    bundled_files: set[pathlib.Path]
+    additional_files: set[pathlib.Path]
+    signature: CPUSignature
+    version: str
+    platform: str
+
+    @property
+    def name(self) -> str:
+        print('self.additional_files.length', len(self.additional_files))
+        if len(self.additional_files) == 0:
+            return f'Camera_{self.platform}_{self.signature.value}_{self.version}_{self.project}_hlk'
+        return f'Camera_{self.platform}_{self.signature.value}_{self.version}_{self.project}'
+
+
+@dataclasses.dataclass
+class PackerManifest(PackageManifest):
+    base_dir: pathlib.Path
+    dest_dir: pathlib.Path
+    format: str
+
+    def to_package_manifest(self) -> PackageManifest:
+        self_dict: dict[str, Any] = dataclasses.asdict(self)
+        k: str
+        return PackageManifest(
+            **{k: self_dict[k] for k in self_dict if k in PackageManifest.__dataclass_fields__})
+
+
+# Support parsing duplicated options in inf
+# https://stackoverflow.com/a/15848928/1592410
+class KeyCaseInsensitiveValueExtendedDict(collections.OrderedDict):
+    def __setitem__(self, key: str, value: Any):
+        if isinstance(value, list) and key in self:
+            self[key].extend(value)
+            return
+        super().__setitem__(key, value)
+
+    def __contains__(self, key: str) -> bool:
+        k: str
+        for k in self.keys():
+            if k.lower() != key.lower():
+                continue
+            return super().__contains__(k)
+        return False
+
+    def __getitem__(self, key: str) -> Any:
+        k: str
+        for k in self.keys():
+            if k.lower() != key.lower():
+                continue
+            return super().__getitem__(k)
+
+
+class PackerManifestGenerator:
+    ADDITIONAL_FILES: set[pathlib.Path] = [
+        pathlib.Path('Bootloader'),
+    ]
+
+    PLATFORM_MAP: dict[str, str] = {
+        '20': 'BYT',
+        '21': 'CHT',
+        '30': 'SKC',
+        '40': 'BXT',
+        '41': 'CNL',
+        '42': 'ICL',
+        '50': 'LKF',
+        '60': 'TGL',
+        '61': 'TGL_H',
+        '62': 'JSL',
+        '63': 'ADL',
+        '64': 'MTL',
+        '70': 'LNL',
+        '71': 'PTL',
+    }
+
+    REFERENCE_INF: str = 'iacamera64.inf'
+    SENSOR_REFERENCE_INF: str = 'iacamera64.inf'
+    #SENSOR_REFERENCE_INF: str = 'ov08x40.inf'
+
+    def __init__(self, project: str, base_dir: pathlib.Path, dest_dir: pathlib.Path, format_: str, sensor_base : str, no_addfiles : bool) -> None:
+        self.project: str = project
+        self.base_dir: pathlib.Path = base_dir
+        self.dest_dir: pathlib.Path = dest_dir
+        self.format: str = format_
+        self._infs: Optional[set[pathlib.Path]] = None
+        self.SENSOR_REFERENCE_INF = sensor_base + '.inf'
+        if no_addfiles is True: 
+            self.ADDITIONAL_FILES: set[pathlib.Path] = []
+        print(self.SENSOR_REFERENCE_INF)
+
+    def get_project_ingredient_path(self) -> pathlib.Path:
+        res: Optional[pathlib.Path] = None
+
+        if os.path.isfile(self.project):
+            res = pathlib.Path(self.project)
+
+        if not res and (pathlib.Path(
+                os.path.realpath(__file__)).parent /
+                        Asset.CONFIG.value /
+                        Config.PROJECTS.value /
+                        f'{self.project}.txt').exists():
+            res = (pathlib.Path(
+                os.path.realpath(__file__)).parent /
+                   Asset.CONFIG.value /
+                   Config.PROJECTS.value /
+                   pathlib.Path(self.project).stem).with_suffix('.txt')
+
+        if not res:
+            raise FileNotFoundError(f'unsupported project: {self.project}')
+
+        return res
+
+    def get_infs(self) -> set[pathlib.Path]:
+        if self._infs is None:
+            project_ingredient_path: pathlib.Path = self.get_project_ingredient_path()
+            self._infs = set()
+            f: io.TextIOWrapper
+            with open(project_ingredient_path) as f:
+                inf_name: str
+                for inf_name in f.readlines():
+                    inf_name = inf_name.strip()
+                    inf_name = inf_name.removesuffix('.inf')
+                    if not inf_name:
+                        continue
+                    if '*' not in inf_name:
+                        self._infs.add(pathlib.Path(f'{inf_name}.inf'))
+                        continue
+                    p: pathlib.Path
+                    self._infs.update(map(
+                        lambda p: p.relative_to(self.base_dir), self.base_dir.glob(f'{inf_name}.inf')))
+            inf: pathlib.Path
+            missing_infs: list[pathlib.Path] = \
+                [inf for inf in sorted(self._infs) if not (self.base_dir / inf).is_file()]
+            if missing_infs:
+                raise FileNotFoundError(', '.join(sorted(map(str, missing_infs))))
+
+        return self._infs
+
+    def get_cats(self) -> set[pathlib.Path]:
+        res: set[pathlib.Path] = set()
+        for inf in self.get_infs():
+            config: configparser.ConfigParser = configparser.ConfigParser(
+                allow_no_value=True, dict_type=KeyCaseInsensitiveValueExtendedDict, strict=False)
+            config.optionxform = str
+            config.read(self.base_dir / inf, encoding='utf-16')
+            key: str
+            for key in config['version']:
+                if not key.lower().startswith('catalogfile'):
+                    continue
+                res.add(inf.parent / config['version'].get(key))
+            cat: pathlib.Path
+            missing_cats: list[pathlib.Path] = \
+                [cat for cat in sorted(res) if not (self.base_dir / cat).is_file()]
+            if missing_cats:
+                raise FileNotFoundError(', '.join(sorted(map(str, missing_cats))))
+        return res
+
+    def get_bundled_files(self) -> set[pathlib.Path]:
+        res: set[pathlib.Path] = set()
+        inf: pathlib.Path
+        for inf in self.get_infs():
+            config: configparser.ConfigParser = configparser.ConfigParser(
+                allow_no_value=True, dict_type=KeyCaseInsensitiveValueExtendedDict, strict=False)
+            config.optionxform = str
+            config.read(self.base_dir / inf, encoding='utf-16')
+            section: str
+            for section in config:
+                if not section.lower().startswith('sourcedisksfiles'):
+                    continue
+                key: str
+                for key in config[section]:
+                    src_file: str = key
+                    res.add(inf.parent / src_file)
+            bundled_file: pathlib.Path
+            missing_bundled_files: list[pathlib.Path] = \
+                [bundled_file for bundled_file in sorted(res) if not (self.base_dir / bundled_file).is_file()]
+            if missing_bundled_files:
+                raise FileNotFoundError(', '.join(sorted(map(str, missing_bundled_files))))
+        return res
+
+    def get_additional_files(self) -> set[pathlib.Path]:
+        res: set[pathlib.Path] = set()
+        p: pathlib.Path
+        for p in self.ADDITIONAL_FILES:
+            if (self.base_dir / p).is_file():
+                res.add(p)
+            if (self.base_dir / p).is_dir():
+                f: pathlib.Path
+                for f in (self.base_dir / p).glob('**/*'):
+                    if not f.is_file():
+                        continue
+                    res.add(f.relative_to(self.base_dir))
+        return res
+
+    def get_platform(self) -> str:
+        return self.PLATFORM_MAP.get(self.get_version().split('.')[0], 'unknown')
+
+    def get_version(self) -> str:
+        res: str = 'Unknown_Version'
+
+        if (self.base_dir / self.SENSOR_REFERENCE_INF).exists():
+            config: configparser.ConfigParser = configparser.ConfigParser(
+                allow_no_value=True, dict_type=KeyCaseInsensitiveValueExtendedDict, strict=False)
+            config.optionxform = str
+            config.read(self.base_dir / self.SENSOR_REFERENCE_INF, encoding='utf-16')
+            res = '.'.join(config['version'].get('driverver').split(',')[1:]).strip()
+        return res
+
+    def get_signature(self) -> CPUSignature:
+        res: CPUSignature = CPUSignature.inter_ES
+        if (str(self.base_dir).find('External') != -1):
+            res = CPUSignature.ext_ES
+			
+            if (str(self.base_dir).find('Product_Signed') != -1):
+                res = CPUSignature.ext_QS
+            
+        else:
+            if (str(self.base_dir).find('Product_Signed') != -1):
+                res = CPUSignature.inter_QS
+            
+        #if (self.base_dir / 'Bootloader').exists():
+        #    res = CPUSignature.QS
+        return res
+
+    def generate(self) -> PackerManifest:
+        return PackerManifest(
+            project=self.project,
+            base_dir=self.base_dir,
+            dest_dir=self.dest_dir,
+            format=self.format,
+            infs=self.get_infs(),
+            cats=self.get_cats(),
+            bundled_files=self.get_bundled_files(),
+            additional_files=self.get_additional_files(),
+            platform=self.get_platform(),
+            version=self.get_version(),
+            signature=self.get_signature())
+
+
+class Packer:
+    MANIFEST_JSON: str = '.manifest.json'
+
+    def __init__(
+            self,
+            manifest: PackerManifest) -> None:
+        self.manifest: PackerManifest = manifest
+
+    def pack(self) -> pathlib.Path:
+        tmpdir: pathlib.Path = pathlib.Path(tempfile.mkdtemp())
+        orig_dir = pathlib.Path.cwd()
+        os.chdir(self.manifest.base_dir)
+        p: pathlib.Path
+        for p in itertools.chain(
+                self.manifest.infs,
+                self.manifest.cats,
+                self.manifest.bundled_files,
+                self.manifest.additional_files):
+            if p.parent != self.manifest.base_dir.relative_to(self.manifest.base_dir):
+                os.makedirs(tmpdir / p.parent, exist_ok=True)
+            shutil.copy2(p, tmpdir / p)
+        dest = self.manifest.dest_dir / f'{self.manifest.name}'
+        shutil.make_archive(str(dest), 'zip', root_dir=tmpdir)
+        os.chdir(orig_dir)
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        return pathlib.Path(str(dest) + '.zip')
+
+
+def get_base_dirs(driver_pool: pathlib.Path) -> Iterable[pathlib.Path]:
+    p: pathlib.Path
+    for p in driver_pool.glob(f'**/{PackerManifestGenerator.REFERENCE_INF}'):
+        yield p.parent
+
+
+def get_args() -> argparse.Namespace:
+    p: pathlib.Path
+    supported_projects: list[str] = list(
+        p.stem for p in (pathlib.Path(os.path.realpath(__file__)).parent /
+                         Asset.CONFIG.value /
+                         Config.PROJECTS.value).glob('*') if p.is_file())
+
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(
+        prog='pack_light',
+        description='create driver packages of projects based on the given driver pool - [date: 20230922]',
+        epilog='''example 1: using iacamera64.inf version
+
+\t./pack_light -d ../Drivers/ICE_build/LNL/17232_4/ -v Dell-Tributo-LNL
+
+example 2: using hi556.inf version
+
+\t./pack_light -d ../Drivers/ICE_build/LNL/17232_4/ -v Dell-Tributo-LNL -s ov02c10
+
+example 3: packing without additional files, ex. Bootloader
+
+\t./pack_light -d ../Drivers/ICE_build/LNL/17232_4/ -v Dell-Tributo-LNL -s ov02c10 --no-addfiles
+
+               ''',
+        formatter_class=argparse.RawTextHelpFormatter)
+
+    parser.add_argument(
+        '-d', '--driver-pool',
+        default=pathlib.Path(os.path.realpath(__file__)).parent / pathlib.Path(
+            '../w/camerasw/bins/Release.x64/Product'),
+        type=pathlib.Path,
+        help='Path to the folder that contains source drivers. ')
+    parser.add_argument(
+        '--dry-run', action='store_true', help='do everything except generating the package files')
+    parser.add_argument(
+        '-v', '--verbose', action='count', default=0, help='show diagnostic info')
+    parser.add_argument(
+        '-s', '--sensor-name',
+        default='iacamera64',
+        type=str,
+        help='sensor name : used for generate ICE version, default using stack driver iacamera64.inf version')
+    parser.add_argument(
+        '--no-addfiles', action='store_true', help='do not include additional files, ex bootloaders')
+    parser.add_argument(
+        'projects', metavar='project', nargs='*', default=['ALL'],
+        help="Name(s) of project(s). "
+             "Both filename (with or without the extension) and path are supported. Default is 'ALL'.")
+    #return parser.parse_args()
+    return parser.parse_args(args=None if sys.argv[1:] else ['--help'])
+
+
+
+def keyboard_interrupt_handler(signum: int, frame: object):
+    print('WARNING: Interrupted with Ctrl-C', file=sys.stderr)
+    sys.exit(1)
+
+
+def main() -> int:
+    signal.signal(signal.SIGINT, keyboard_interrupt_handler)
+
+    orig_dir: pathlib.Path = pathlib.Path.cwd()
+    args: argparse.Namespace = get_args()
+
+    if args.verbose > 0:
+        k: str
+        v: Any
+        for k, v in vars(args).items():
+            print(f'{k}: {v}')
+
+    i: int = 1
+    manifests: list[PackerManifest] = list()
+    m: str
+    for m in args.projects:
+        base_dir: pathlib.Path
+        for base_dir in get_base_dirs(args.driver_pool):
+            s: str
+            manifest: PackerManifest = PackerManifestGenerator(
+                project=pathlib.Path(m).stem,
+                base_dir=base_dir,
+                dest_dir=orig_dir,
+                format_='zip',
+				sensor_base = args.sensor_name,
+                no_addfiles = args.no_addfiles).generate()
+
+            if args.verbose > 1:
+                print(f'manifest {i}:')
+                print(f'  name: {manifest.name}')
+                print(f'  project: {manifest.project}')
+                print(f'  platform: {manifest.platform}')
+                print(f'  version: {manifest.version}')
+                print(f'  signature: {manifest.signature.value}')
+                print(f'  format: {manifest.format}')
+                print(f'  base dir: {manifest.base_dir}')
+                print(f'  dest dir: {manifest.dest_dir}')
+                print(f'  infs:', end=f'{os.linesep}    ')
+                print(f'{os.linesep}    '.join(sorted(map(str, manifest.infs))))
+                print(f'  cats:', end=f'{os.linesep}    ')
+                print(f'{os.linesep}    '.join(sorted(map(str, manifest.cats))))
+                print(f'  bundled files:', end=f'{os.linesep}    ')
+                print(f'{os.linesep}    '.join(sorted(map(str, manifest.bundled_files))))
+                if manifest.additional_files:
+                    print(f'  additional files:', end=f'{os.linesep}    ')
+                    print(f'{os.linesep}    '.join(sorted(map(str, manifest.additional_files))))
+
+            manifests.append(manifest)
+            i += 1
+
+        if not manifests:
+            raise FileNotFoundError(f'unsupported driver pool: {args.driver_pool}')
+
+    if args.dry_run:
+        return 0
+
+    manifest: PackerManifest
+    for manifest in manifests:
+        print(f'Packed: {Packer(manifest).pack()}')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

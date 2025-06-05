@@ -1,0 +1,6 @@
+iacamera64
+ACER\iacamera64_ext_ccg_acer
+iactrllogic64
+iaisp64
+HI556
+ACER\hi556_extension_acer
