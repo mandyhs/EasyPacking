@@ -246,7 +246,7 @@ class PackerManifestGenerator:
             # print inf versions
             print(f"inf\t\tversion")
             print(f"====\t\t=======")
-            ver_note_name = f'{self.get_version()}_{CPUSignature(self.get_signature()).value}_note.txt'
+            ver_note_name = f'{self.dest_dir}/{self.get_version()}_{CPUSignature(self.get_signature()).value}_note.txt'
             if (self.dest_dir / ver_note_name).exists():
                 print(f"  {ver_note_name} exists")
 
@@ -258,7 +258,7 @@ class PackerManifestGenerator:
                     config.read(self.base_dir / inf, encoding='utf-16')
                     res = '.'.join(config['version'].get('driverver').split(',')[1:]).strip()
                     print(f'{inf}\t\t{res}\n')
-                    print(f'{inf}\t\t{res}\n', file=f)
+                    print(f'{inf}\t\t{res}', file=f)
             print(f"\n====\n")
             print(f"total {len(self._infs)} infs")
 
@@ -457,6 +457,11 @@ example 3: packing without additional files, ex. Bootloader
         'projects', metavar='project', nargs='*', default=['ALL'],
         help="Name(s) of project(s). "
              "Both filename (with or without the extension) and path are supported. Default is 'ALL'.")
+    parser.add_argument(
+        '-o','--output-package',
+        default=None,
+        type=pathlib.Path,
+        help='Path to the output package file. If not specified, the package will be created in the current directory with a name based on the project and version.')
     #return parser.parse_args()
     return parser.parse_args(args=None if sys.argv[1:] else ['--help'])
 
@@ -479,6 +484,20 @@ def main() -> int:
         for k, v in vars(args).items():
             print(f'{k}: {v}')
 
+    if args.output_package is not None:
+        if not args.output_package.is_dir():
+            os.makedirs(args.output_package, exist_ok=True)
+        if not args.output_package.is_absolute():
+            args.output_package = orig_dir / args.output_package
+
+        args.dest_dir = args.output_package
+    else:
+        args.dest_dir = orig_dir
+
+    print(f'dest dir: {args.dest_dir}')
+    if not args.dest_dir.is_dir():
+        raise NotADirectoryError(f'destination directory does not exist: {args.dest_dir}')
+
     i: int = 1
     manifests: list[PackerManifest] = list()
     m: str
@@ -489,7 +508,7 @@ def main() -> int:
             manifest: PackerManifest = PackerManifestGenerator(
                 project=pathlib.Path(m).stem,
                 base_dir=base_dir,
-                dest_dir=orig_dir,
+                dest_dir=args.dest_dir,
                 format_='zip',
 				sensor_base = args.sensor_name,
                 no_addfiles = args.no_addfiles).generate()

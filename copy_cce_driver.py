@@ -11,7 +11,7 @@ LOCAL_DST_ROOT = "C:\\Users\\mandyhsi\\workspace\\Drivers\\ICE_build\\"
 PLATFORM_MAP: dict[str, list] = {
     'MTL':['Z:\\IPU6_MTL_x64\\','MTL'],
     'LNL':['Z:\\IPU7_LNL_x64\\','LNL'], 
-    'PTL':['Z:\\master_IPU7_PTL_x64\\','master'],  
+    'PTL':['Z:\\master_IPU7_PTL_x64\\','PTL'],  
 	'ADL':['Z:\\IPU6_ADL_x64\\','ADL'],
     #Z:\IPU7_LNL_x64\13942_1\Product   
 }
@@ -136,6 +136,7 @@ def main():
             f for f in os.listdir(ICE_driver_path)
             if os.path.isfile(os.path.join(ICE_driver_path, f)) and ZIP_substring in f
         ]
+        
         print(zips)
 
     # define designation path
@@ -143,7 +144,13 @@ def main():
     print(f'copy driver zip into: {LOCAL_dst}')
     os.makedirs(LOCAL_dst,  exist_ok=True)
 
-    # download zip
+    # download debug zip
+    if os.path.exists(pathlib.Path(ICE_driver_path, 'Debug_Camera_' + str(args.platform) + '.zip')):
+            shutil.copy2(
+                pathlib.Path(ICE_driver_path, 'Debug_Camera_' + str(args.platform) + '.zip'),
+                pathlib.Path(LOCAL_dst, 'Debug_Camera_' + str(args.platform) + '.zip')
+            )
+        
     '''
     for z in zips:
         if not os.path.exists(pathlib.Path(LOCAL_dst,z)) :

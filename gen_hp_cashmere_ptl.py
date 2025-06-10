@@ -6,10 +6,10 @@ from run_script_utils import run_python_script
 
 import pathlib
 
-project_name = "Dell Tributo LNL"
-project_config = "Dell-Tributo-LNL-2nd"
-sensor = "ov02e10"
-platform = "LNL"
+project_name = "Hp-Cashmere-PTL"
+project_config = "Hp-Cashmere-PTL"
+sensor = "ov05c10"
+platform = "PTL"
 
 def main():
     parser = argparse.ArgumentParser(
