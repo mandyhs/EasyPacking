@@ -159,7 +159,7 @@ def main():
             shutil.copy2(pathlib.Path(ICE_driver_path,z), pathlib.Path(LOCAL_dst,z))
     '''
 
-    # unzip to des folder
+    # unzip package to des folder
     for z in zips:
         if os.path.exists(pathlib.Path(ICE_driver_path,z)):
             if already_extracted(pathlib.Path(LOCAL_dst,z.replace('_symbols.zip', ''))):
@@ -170,8 +170,15 @@ def main():
             with zipfile.ZipFile(pathlib.Path(ICE_driver_path,z), 'r') as zip_ref:
                 zip_ref.extractall(LOCAL_dst)
 
-    # return des path 
+    # copy AIQB.txt
+    aiqb_txt_path = pathlib.Path(ICE_driver_path, 'AIQB.txt')
+    if os.path.exists(aiqb_txt_path):
+        print(f'copying AIQB.txt... {aiqb_txt_path}')
+        shutil.copy2(aiqb_txt_path, pathlib.Path(LOCAL_dst, 'AIQB.txt'))
+    else:
+        print(f'❗ AIQB.txt not found in {ICE_driver_path}')
 
+    
 
 
 if __name__ == '__main__':
