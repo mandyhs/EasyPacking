@@ -36,13 +36,19 @@ def main():
         print(k,v)
 
     aiqb_list = []
-    
-    if pathlib.Path(args.aiqb_path).is_dir:
-        print(f'this is a folder, scan all aiqb below')
+
+    if pathlib.Path(args.aiqb_path).is_dir():
+        print(f'folder: {args.aiqb_path}, scan all aiqb below')
 
         for file in os.listdir(args.aiqb_path):
             if file.endswith(".aiqb"):
                 aiqb_list.append(os.path.join(args.aiqb_path, file))
+
+            if os.path.isdir(file):
+                print(f'>>>>> {file} is a folder, scan all aiqb below')
+                for subfile in os.listdir(file):
+                    if subfile.endswith(".aiqb"):
+                        aiqb_list.append(os.path.join(file, subfile))
     else:
         aiqb_list.append(args.aiqb_path)
 

@@ -6,7 +6,7 @@ from run_script_utils import run_python_script
 from parse_aiqb_for_project import parse_aiqb_from_build
 import pathlib
 
-def gen_process(version: str, project_name: str, platform: str, project_config: str, sensor: str, module_name: list[str]):
+def gen_process(version: str, project_name: str, platform: str, project_config: str, sensor: str, module_name: list[str], local_dst_root: str):
 
     if version == '00':
         # grep which version want to download
@@ -28,8 +28,8 @@ def gen_process(version: str, project_name: str, platform: str, project_config: 
     run_python_script("copy_cce_driver.py", copy_worker_args)
     print(f'🙌🙌🙌  completed get cce build for {project_name} {version}.\n\n')
 
-    # pack drvier package
-    driver_path = pathlib.Path(__file__).parent / f"../Drivers/ICE_build/{platform}/{version}/"
+    # pack driver package
+    driver_path = pathlib.Path(__file__).parent / f"{local_dst_root}/{platform}/{version}/"
     print(f"driver_path: {driver_path}")
 
     output_dir = f"{project_config}-{version}"

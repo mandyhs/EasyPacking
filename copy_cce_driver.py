@@ -5,8 +5,10 @@ import sys, os, pathlib,datetime
 import argparse
 import zipfile
 
-CCE_BUILD_ROOT = "\\\twsimglab005\camera_drivers"
-LOCAL_DST_ROOT = "C:\\Users\\mandyhsi\\workspace\\Drivers\\ICE_build\\"
+import config_env
+
+CCE_BUILD_ROOT = config_env.CCE_BUILD_ROOT
+LOCAL_DST_ROOT = config_env.LOCAL_DST_ROOT
 
 PLATFORM_MAP: dict[str, list] = {
     'MTL':['Z:\\IPU6_MTL_x64\\','MTL'],

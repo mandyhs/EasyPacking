@@ -257,7 +257,7 @@ class PackerManifestGenerator:
                     config.optionxform = str
                     config.read(self.base_dir / inf, encoding='utf-16')
                     res = '.'.join(config['version'].get('driverver').split(',')[1:]).strip()
-                    print(f'{inf}\t\t{res}\n')
+                    print(f'{inf}\t\t{res}')
                     print(f'{inf}\t\t{res}', file=f)
             print(f"\n====\n")
             print(f"total {len(self._infs)} infs")
@@ -399,7 +399,7 @@ class Packer:
                 dest: pathlib.Path = self.manifest.dest_dir / f'PrivateSymbols_{self.manifest.version.replace(".","_")}_qs'
             else:
                 print(f'copy symbols from {self.manifest.base_dir / "PrivateSymbols"}')
-                dest = self.manifest.dest_dir / f'PrivateSymbols_{self.manifest.version.replace('.','_')}'
+                dest = self.manifest.dest_dir / f'PrivateSymbols_{self.manifest.version.replace(".",'_')}'
             print(f'dest: {dest}')
             copytree_with_prompt(self.manifest.base_dir / 'PrivateSymbols', dest)
 

@@ -12,7 +12,7 @@ def get_args() -> argparse.Namespace:
     print('\n== get args ==\n')
 
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
-        prog='check_sign',
+        prog='check_AIQB',
         description='...',
         epilog='''example:    ./check_AIQB.py -f XXXX.aiqb''',
         formatter_class=argparse.RawTextHelpFormatter)

@@ -5,6 +5,9 @@ import sys
 from gen_driver_package_by_project import gen_process
 
 import pathlib
+import config_env
+
+LOCAL_DST_ROOT = config_env.LOCAL_DST_ROOT
 
 project_name = "Dell Xps Arl"
 project_config = "Dell-Xps-ARL-2nd"
@@ -27,7 +30,8 @@ def main():
         platform=platform,
         project_config=project_config,
         sensor=sensor,
-        module_name=module_name
+        module_name=module_name,
+        local_dst_root=LOCAL_DST_ROOT
     )  
 
 if __name__ == '__main__':
