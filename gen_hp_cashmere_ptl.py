@@ -7,6 +7,7 @@ from gen_driver_package_by_project import gen_process
 import config_env
 
 LOCAL_DST_ROOT = config_env.LOCAL_DST_ROOT
+PACK_OUTPUT_ROOT = config_env.PACK_OUTPUT_ROOT
 
 project_name = "Hp-Cashmere-PTL"
 project_config = "Hp-Cashmere-PTL"
@@ -32,7 +33,8 @@ def main():
         project_config=project_config,
         sensor=sensor,
         module_name=module_name,
-        local_dst_root=LOCAL_DST_ROOT
+        local_dst_root=LOCAL_DST_ROOT,
+        pack_output_dir=PACK_OUTPUT_ROOT
     ) 
 
 if __name__ == '__main__':

@@ -86,6 +86,33 @@ def already_extracted(path):
     print(f'check if {path} is already extracted')
     return os.path.exists(path) and os.listdir(path)
 
+def check_the_latest_n_version(plt_path: str, n: int) -> str:
+    """check the latest version in the platform path"""
+    items = os.listdir(plt_path)
+    items.sort(key=lambda f: os.path.getmtime(os.path.join(plt_path, f)), reverse=True)
+    if items:
+        for fname in items[:n]:
+            full_path = os.path.join(plt_path, fname)
+            ts = os.path.getmtime(full_path)
+            mod_dt = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+            print(f"  {fname}    Last Modified: {mod_dt}")
+        return items[:n]  # return the most recent version
+    else:
+        print(f'[ERROR] No versions found in {plt_path}')
+        return []
+    
+def get_plt_path(platform: str) -> str:
+    """get the platform path from PLATFORM_MAP"""
+    if platform in PLATFORM_MAP:
+        if not os.path.exists(PLATFORM_MAP[platform][0]):
+            print(f'[ERROR] Platform path {PLATFORM_MAP[platform][0]} does not exist')
+            return 'path_not_found'
+        return str(PLATFORM_MAP[platform][0])
+    else:
+        print(f'[ERROR] Platform {platform} not found in PLATFORM_MAP')
+        return 'path_not_found'
+
+
 def main():
     print(f'download driver from - {CCE_BUILD_ROOT}')
 
@@ -98,23 +125,17 @@ def main():
         print(f'{k}, {v}')
 
     # get platform and path 
-    ICE_plt_path = str(PLATFORM_MAP[str(args.platform)][0]) 
-    if not os.path.exists(ICE_plt_path): 
+    ICE_plt_path = get_plt_path(str(args.platform))
+    if ICE_plt_path == 'path_not_found':
         print(f'[ERROR] driver path is not exist, please check the version num\n {ICE_plt_path}')
         exit(2)
 
     print(f'ICE_plt_path: {ICE_plt_path}\n')
 
     if str(args.version) == '0':
-        # list the latest 3 version 
-        items = os.listdir(ICE_plt_path)
-        items.sort(key=lambda f: os.path.getmtime(os.path.join(ICE_plt_path, f)), reverse=True)
-        latest_files = items[:5]
-        for fname in latest_files:
-            full_path = os.path.join(ICE_plt_path, fname)
-            ts = os.path.getmtime(full_path)
-            mod_dt = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-            print(f"  {fname}    Last Modified: {mod_dt}")
+        # list the latest 5 version 
+        latest_versions = check_the_latest_n_version(ICE_plt_path, 5)
+        print(f"\n👀 choose which do u want  {latest_versions}...\n\n")
         exit(0)
 
     # find zips
