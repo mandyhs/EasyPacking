@@ -399,7 +399,7 @@ class Packer:
                 dest: pathlib.Path = self.manifest.dest_dir / f'PrivateSymbols_{self.manifest.version.replace(".","_")}_qs'
             else:
                 print(f'copy symbols from {self.manifest.base_dir / "PrivateSymbols"}')
-                dest = self.manifest.dest_dir / f'PrivateSymbols_{self.manifest.version.replace(".",'_')}'
+                dest = self.manifest.dest_dir / f'PrivateSymbols_{self.manifest.version.replace(".","_")}'
             print(f'dest: {dest}')
             copytree_with_prompt(self.manifest.base_dir / 'PrivateSymbols', dest)
 
