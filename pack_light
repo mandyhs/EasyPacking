@@ -53,27 +53,27 @@ def input_with_timeout(prompt, timeout=10, default="y"):
     timer_thread.join()
 
     if input_thread.is_alive():
-        print(f"\n⏰ over {timeout} seconds, auto choose: {default}")
+        print(f"\n[+] over {timeout} seconds, auto choose: {default}")
 
     return user_input[0]
 
 def copytree_with_prompt(src: str, dst: str):
     if os.path.exists(dst):
-        print(f"⚠️ dst exist：{dst}")
+        print(f"[!!!] dst exist：{dst}")
         choice = input_with_timeout(f"overwrite? (y/n)（{input_timeout} s, default y）: ", input_timeout)
         #choice = input("overwrite it? (y/n): ").strip().lower()
 
         if choice != "y":
-            print("❌ user chose not to overwrite. Exiting.")
+            print("[X] user chose not to overwrite. Exiting.")
             return
 
         # 確認覆蓋時，先刪掉目標資料夾
-        print(f"🗑️ delete the old dir: {dst} ...")
+        print(f"[XXX] delete the old dir: {dst} ...")
         shutil.rmtree(dst)
 
-    print(f"📁 copying ... {src} ➜ {dst}")
+    print(f"[O] copying ... {src} ➜ {dst}")
     shutil.copytree(src, dst, symlinks=False, ignore=None)
-    print("✅ copy completed.")
+    print("[V] copy completed.")
 
 class CPUSignature(enum.Enum):
     inter_ES: 'CPUSignature' = 'Internal_ES'
