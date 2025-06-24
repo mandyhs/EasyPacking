@@ -24,13 +24,13 @@ def gen_process(version: str, project_name: str, platform: str, project_config: 
     
     if version == '00':
         # grep which version want to download
-        print(f"👀 choose which do u want  {version}...\n\n")
+        print(f"[RR] choose which do u want  {version}...\n\n")
         copy_worker_args = {
             "-v": 0,
             "-p": platform
         }
         run_python_script("copy_cce_driver.py", copy_worker_args)
-        print(f'👀 choose which do u want \n\n')
+        print(f'[RR] choose which do u want \n\n')
         exit(0)
 
     # get cce build
@@ -62,10 +62,10 @@ def gen_process(version: str, project_name: str, platform: str, project_config: 
     parse_aiqb_from_build(driver_path, output_dir, module_name=module_name, platform=platform)
     print(f"Parsed AIQB.txt and saved to {output_dir}/IQ_info.txt")
 
-    print(f'🙌🙌🙌  completed pack driver package for {project_name} {version}.\n\n')
+    print(f'[+++] completed pack driver package for {project_name} {version}.\n\n')
 
     # move output to local destination
     pack_output_dir = pathlib.Path(pack_output_dir) / output_dir
     print(f"Moving output to local destination: {pack_output_dir}")
     shutil.move(output_dir, pack_output_dir)
-    print(f'🙌🙌🙌  completed move output to local destination for {project_name} {version}.\n\n')
+    print(f'[+++] completed move output to local destination for {project_name} {version}.\n\n')
