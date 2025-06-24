@@ -17,7 +17,7 @@ def run_python_script(script_path: str, args_dict: dict = None):
             if value is not None:  # 支援 flag 類型參數（如 --verbose）
                 args.append(str(value))
     
-    print(f"🔧 execute: {' '.join(args)}")
+    print(f"[+++] execute: {' '.join(args)}")
 
     try:
         result = subprocess.run(args, check=True)
