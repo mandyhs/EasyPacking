@@ -21,7 +21,7 @@ def run_python_script(script_path: str, args_dict: dict = None):
 
     try:
         result = subprocess.run(args, check=True)
-        print(f"✅ exit code: {result.returncode}")
+        print(f"[V] exit code: {result.returncode}")
     except subprocess.CalledProcessError as e:
-        print(f"❌ failed!!  exit code {e.returncode}）")
+        print(f"[X] failed!!  exit code {e.returncode}）")
         raise
