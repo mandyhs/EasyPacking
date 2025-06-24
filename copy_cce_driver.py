@@ -11,10 +11,10 @@ CCE_BUILD_ROOT = config_env.CCE_BUILD_ROOT
 LOCAL_DST_ROOT = config_env.LOCAL_DST_ROOT
 
 PLATFORM_MAP: dict[str, list] = {
-    'MTL':['Z:\\IPU6_MTL_x64\\','MTL'],
-    'LNL':['Z:\\IPU7_LNL_x64\\','LNL'], 
-    'PTL':['Z:\\master_IPU7_PTL_x64\\','PTL'],  
-	'ADL':['Z:\\IPU6_ADL_x64\\','ADL'],
+    'MTL':['{CCE_BUILD_ROOT}\\IPU6_MTL_x64\\','MTL'],
+    'LNL':['{CCE_BUILD_ROOT}\\IPU7_LNL_x64\\','LNL'], 
+    'PTL':['{CCE_BUILD_ROOT}\\master_IPU7_PTL_x64\\','PTL'],  
+	'ADL':['{CCE_BUILD_ROOT}\\IPU6_ADL_x64\\','ADL'],
     #Z:\IPU7_LNL_x64\13942_1\Product   
 }
 
