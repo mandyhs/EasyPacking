@@ -40,7 +40,7 @@ def gen_process(version: str, project_name: str, platform: str, project_config: 
         "-p": platform
     }
     run_python_script("copy_cce_driver.py", copy_worker_args)
-    print(f'🙌🙌🙌  completed get cce build for {project_name} {version}.\n\n')
+    print(f'[+++]  completed get cce build for {project_name} {version}.\n\n')
 
     # pack driver package
     driver_path = pathlib.Path(__file__).parent / f"{local_dst_root}/{platform}/{version}/"
