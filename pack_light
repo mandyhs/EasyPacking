@@ -452,7 +452,7 @@ example 3: packing without additional files, ex. Bootloader
         type=str,
         help='sensor name : used for generate ICE version, default using stack driver iacamera64.inf version')
     parser.add_argument(
-        '--no-addfiles', action='store_true', help='do not include additional files, ex bootloaders')
+        '--no-addfiles', default=None, help='do not include additional files, ex bootloaders')
     parser.add_argument(
         'projects', metavar='project', nargs='*', default=['ALL'],
         help="Name(s) of project(s). "
