@@ -115,8 +115,8 @@ class PackageManifest:
     @property
     def name(self) -> str:
         print('self.additional_files.length', len(self.additional_files))
-        if len(self.additional_files) == 0:
-            return f'Camera_{self.platform}_{self.signature.value}_{self.version}_{self.project}_h'
+        #if len(self.additional_files) == 0:
+        #    return f'Camera_{self.platform}_{self.signature.value}_{self.version}_{self.project}_h'
         return f'Camera_{self.platform}_{self.signature.value}_{self.version}_{self.project}'
 
 
@@ -452,7 +452,7 @@ example 3: packing without additional files, ex. Bootloader
         type=str,
         help='sensor name : used for generate ICE version, default using stack driver iacamera64.inf version')
     parser.add_argument(
-        '--no-addfiles', default=None, help='do not include additional files, ex bootloaders')
+        '--no-addfiles', default=True, help='do not include additional files, ex bootloaders')
     parser.add_argument(
         'projects', metavar='project', nargs='*', default=['ALL'],
         help="Name(s) of project(s). "
